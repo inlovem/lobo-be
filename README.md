@@ -72,6 +72,74 @@ Then run:
 
 Running the Service
 
+1.1 Create a collection:
+
+- Use this as an example to create a collection in the Milvus vector database 
+```json
+{
+    "collection_name": "knowledge_base",
+    "schema_fields": [
+        {
+            "field_name": "id",
+            "datatype": "INT64",
+            "is_primary": true,
+            "auto_id": true
+        },
+        {
+            "field_name": "vector",
+            "datatype": "FLOAT_VECTOR",
+            "dim": 1536
+        },
+        {
+            "field_name": "varchar",
+            "datatype": "VARCHAR",
+            "max_length": 3000
+        }
+    ],
+    "index_params": [
+        {
+            "field_name": "vector",
+            "index_type": "AUTOINDEX",
+            "metric_type": "COSINE"
+        }
+    ]
+}
+```
+Use the API to do so:
+```json
+
+web: http://localhost:8000/create_collection
+payload:
+{
+        "collection_name": "knowledge_base",
+        "schema_fields": [
+            {
+                "field_name": "id",
+                "datatype": "INT64",          // Use string representations; these will be mapped
+                "is_primary": true,
+                "auto_id": true
+            },
+            {
+                "field_name": "vector",
+                "datatype": "FLOAT_VECTOR",
+                "dim": 1536
+            },
+            {
+                "field_name": "varchar",
+                "datatype": "VARCHAR",
+                "max_length": 3000
+            }
+        ],
+        "index_params": [
+            {
+                "field_name": "vector",
+                "index_type": "AUTOINDEX",
+                "metric_type": "COSINE"
+            }
+        ]
+    }
+```
+
 Run the FastAPI application via Uvicorn:
 cd endpoints
 
