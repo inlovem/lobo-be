@@ -106,16 +106,19 @@ Running the Service
 }
 ```
 Use the API to do so:
-```json
+---
 
-web: http://localhost:8000/create_collection
-payload:
-{
+### **Using curl**
+
+```bash
+curl -X POST "http://localhost:8000/create_collection" \
+  -H "Content-Type: application/json" \
+  -d '{
         "collection_name": "knowledge_base",
         "schema_fields": [
             {
                 "field_name": "id",
-                "datatype": "INT64",          // Use string representations; these will be mapped
+                "datatype": "INT64",          // Use string representations; these will be mapped to the correct DataType
                 "is_primary": true,
                 "auto_id": true
             },
@@ -137,10 +140,102 @@ payload:
                 "metric_type": "COSINE"
             }
         ]
-    }
+    }'
 ```
 
+---
+
+### **Explanation**
+
+- **Endpoint URL:**  
+  The API is accessible at `http://localhost:8000/create_collection`.
+
+- **HTTP Method:**  
+  A `POST` request is used to create a new collection.
+
+- **Headers:**  
+  The `Content-Type: application/json` header tells the server that the request body is in JSON format.
+
+- **Payload:**  
+  The JSON data in the `-d` parameter includes:  
+  - **collection_name:** The name of the collection to be created (`knowledge_base` in this example).  
+  - **schema_fields:** An array defining each field in the collection:
+    - The `"id"` field is defined as an `INT64` primary key with auto-generated IDs.
+    - The `"vector"` field is a `FLOAT_VECTOR` with a dimension of 1536.
+    - The `"varchar"` field is a `VARCHAR` field with a maximum length of 3000 characters.
+  - **index_params:** Index parameters for the `"vector"` field, using an `AUTOINDEX` and a `COSINE` metric.
+
+Run this command in your terminal (assuming your FastAPI server is running on port 8000) to create the collection with the specified schema and indexing options.
 Run the FastAPI application via Uvicorn:
+
+Below is an example of how to configure and run the API endpoint using Postman:
+
+Steps to Use Postman
+	1.	Open Postman and Create a New Request:
+	•	Click “New” and then “Request”.
+	•	Name your request (e.g., Create Collection) and save it in a collection if desired.
+	2.	Set the Request Method and URL:
+	•	Change the request method to POST.
+	•	Enter the URL:
+
+http://localhost:8000/create_collection
+
+
+	3.	Set the Request Headers:
+	•	Under the “Headers” tab, add a new header:
+	•	Key: Content-Type
+	•	Value: application/json
+	4.	Set the Request Body:
+	•	Click on the “Body” tab.
+	•	Select “raw”.
+	•	Choose “JSON” from the dropdown (usually appears as Text by default).
+	•	Paste the following JSON payload into the body editor:
+
+```json
+{
+    "collection_name": "knowledge_base",
+    "schema_fields": [
+        {
+            "field_name": "id",
+            "datatype": "INT64",          // Use string representations; these will be mapped to the correct DataType
+            "is_primary": true,
+            "auto_id": true
+        },
+        {
+            "field_name": "vector",
+            "datatype": "FLOAT_VECTOR",
+            "dim": 1536
+        },
+        {
+            "field_name": "varchar",
+            "datatype": "VARCHAR",
+            "max_length": 3000
+        }
+    ],
+    "index_params": [
+        {
+            "field_name": "vector",
+            "index_type": "AUTOINDEX",
+            "metric_type": "COSINE"
+        }
+    ]
+}
+
+```
+
+	Note: Although the inline comments (// ...) are shown here for explanation, JSON does not support comments. Remove them before sending the request. The final JSON should look like this:
+
+	5.	Send the Request:
+	•	Click the “Send” button.
+	•	You should see a response from the server in the “Response” section indicating whether the collection was created successfully or if there was an error.
+
+Summary
+	•	Method: POST
+	•	URL: http://localhost:8000/create_collection
+	•	Headers: Content-Type: application/json
+	•	Body: (Raw JSON payload as provided)
+# Now:
+
 cd endpoints
 
 python api.py

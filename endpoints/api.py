@@ -1,13 +1,15 @@
-import time
-import sys
 import logging
-import uvicorn
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Optional, List
+import sys
+import time
 
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from pymilvus import DataType
+
+from embeddings.constants.embeddings_constants import EmbeddingConstants
 from embeddings.embedding_model import EmbeddingModelWrapper
 from milvus_db.milvus_service import MilvusService, ColorHandler
+from service.models.requests_models import CreateEmbeddingPayload, CreateCollectionPayload, InsertPayload, SearchPayload
 
 ##############################################################################
 # Configure Logger (ColorHandler)
@@ -42,7 +44,7 @@ logger.info("===== [Startup] Server is configuring... =====")
 
 try:
     # 1a. Connect to Milvus
-    service = MilvusService(connection_alias="dg_strato", db_name="dg_strato")
+    service = MilvusService(connection_alias="default", db_name="default")
     logger.info("Successfully connected to MilvusService.")
 
     # 1b. Check Milvus health by calling get_server_version() or listing collections
@@ -70,23 +72,6 @@ except Exception as e:
 
 
 ###############################################################################
-# 2. Pydantic Models
-###############################################################################
-class InsertPayload(BaseModel):
-    entity: str
-    partition_name: Optional[str] = None
-
-class CreateEmbeddingPayload(BaseModel):
-    text: str
-
-class SearchPayload(BaseModel):
-    query: str
-    top_n: int = 3
-    partition_names: Optional[List[str]] = None
-    # For a range-based search, you could add radius, range_filter, etc.
-
-
-###############################################################################
 # 3. Endpoints
 ###############################################################################
 
@@ -103,6 +88,113 @@ def create_embedding(payload: CreateEmbeddingPayload):
         "text": payload.text,
         "embedding": vector
     }
+
+
+###############################################################################
+# New Endpoint: Create a Collection
+###############################################################################
+@app.post("/create_collection")
+def create_collection(payload: CreateCollectionPayload):
+    """
+    Creates a new collection in the Milvus database based on the provided JSON payload.
+
+    Example JSON payload:
+    {
+        "collection_name": "knowledge_base",
+        "schema_fields": [
+            {
+                "field_name": "id",
+                "datatype": "INT64",          // Primary key (supported: INT64, VARCHAR)
+                "is_primary": true,
+                "auto_id": true
+            },
+            {
+                "field_name": "vector",
+                "datatype": "FLOAT_VECTOR",   // Vector field for embeddings
+                "dim": 1536
+            },
+            {
+                "field_name": "varchar",
+                "datatype": "VARCHAR",        // Scalar field of type VARCHAR
+                "max_length": 3000
+            },
+            {
+                "field_name": "flag",
+                "datatype": "BOOL"            // Scalar field of type BOOL
+            },
+            {
+                "field_name": "score",
+                "datatype": "FLOAT"           // Scalar field of type FLOAT
+            }
+        ],
+        "index_params": [
+            {
+                "field_name": "vector",
+                "index_type": "AUTOINDEX",
+                "metric_type": "COSINE"
+            }
+        ]
+    }
+    """
+    collection_name_arg = payload.collection_name
+    schema_fields = payload.schema_fields
+    index_params = payload.index_params
+
+    # Check if the collection already exists.
+    if service.client.has_collection(collection_name_arg):
+        logger.warning(f"Collection '{collection_name_arg}' already exists.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Collection '{collection_name_arg}' already exists."
+        )
+
+    # Mapping of string representations to DataType values.
+    datatype_mapping = {
+        # Primary key fields (also valid as scalar fields)
+        "INT64": DataType.INT64,
+        "VARCHAR": DataType.VARCHAR,
+        # Scalar field types
+        "BOOL": DataType.BOOL,
+        "INT8": DataType.INT8,
+        "INT16": DataType.INT16,
+        "INT32": DataType.INT32,
+        "FLOAT": DataType.FLOAT,
+        "DOUBLE": DataType.DOUBLE,
+        "JSON": DataType.JSON,
+        "Array": DataType.ARRAY,  # Use this if your Milvus client supports an array type.
+        # Vector field type (if needed)
+        "FLOAT_VECTOR": DataType.FLOAT_VECTOR,
+    }
+
+    # Update each schema field's "datatype" from a string to a DataType enum.
+    mapped_schema_fields = []
+    for field in schema_fields:
+        dt_str = field.get("datatype")
+        if dt_str not in datatype_mapping:
+            raise HTTPException(status_code=400, detail=f"Unsupported datatype: {dt_str}")
+        # Replace the string with the corresponding DataType enum.
+        field["datatype"] = datatype_mapping[dt_str]
+        mapped_schema_fields.append(field)
+
+    try:
+        # Create the collection using the mapped schema fields and index parameters.
+        service.create_collection(
+            collection_name=collection_name_arg,
+            schema_fields=mapped_schema_fields,
+            index_params=index_params
+        )
+        logger.info(f"Collection '{collection_name_arg}' created successfully.")
+        return {
+            "status": "success",
+            "collection_name": collection_name_arg,
+            "message": f"Collection '{collection_name_arg}' created successfully."
+        }
+    except Exception as e:
+        logger.error(f"Failed to create collection '{collection_name_arg}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create collection: {e}"
+        )
 
 @app.post("/insert_entity")
 def insert_entity(payload: InsertPayload):

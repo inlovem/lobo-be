@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 
 
@@ -101,3 +101,24 @@ class RequestStatusResponse(BaseModel):
     """
     request_hash: str
     status: str
+
+###############################################################################
+# New Pydantic Model for Collection Creation
+###############################################################################
+class CreateCollectionPayload(BaseModel):
+    collection_name: str
+    schema_fields: List[Dict]   # Each dict represents a field in the schema.
+    index_params: Optional[List[Dict]] = None  # Optional index parameters
+
+class InsertPayload(BaseModel):
+    entity: str
+    partition_name: Optional[str] = None
+
+class CreateEmbeddingPayload(BaseModel):
+    text: str
+
+class SearchPayload(BaseModel):
+    query: str
+    top_n: int = 3
+    partition_names: Optional[List[str]] = None
+    # For a range-based search, you could add radius, range_filter, etc.
